@@ -1,10 +1,11 @@
+
 from django.conf import settings
 from django.shortcuts import redirect, render
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth import authenticate,login,logout
 
-from user_profile.models import Friends, UserProfile
+from user_profile.models import BlockedUser, Friends, PostReaction, UserPost, UserProfile
 
 # Create your views here.
 
@@ -52,12 +53,45 @@ def user_profile(request):
             profile['image'] = settings.MEDIA_URL+profile['image']
     else:
         profile={}
-    return render(request,'user-timeline.html',context=profile)
+    friends = list(Friends.objects.filter(follow=request.user).values_list('following',flat=True))
+    friends.append(request.user.id)
+    user_posts= UserPost.objects.filter(user__id__in=friends).order_by('-created_at')
+    return render(request,'user-timeline.html',context={"profile":profile,'posts':user_posts})
 
-def friend_list(request):
+def friend_list(request,id):
     if request.method=='GET':
         friends_data=[]
         friends = Friends.objects.filter(follow=request.user)
         for friend in friends:
             friends_data.append({"username":friend.following.username,"first_name":friend.following.first_name,"last_name":friend.following.last_name,"post":1,"comments":10,"views":0})
         return render(request,'user-friends.html',context={"friends_list":friends_data})
+     
+    if request.method=='PUT':
+        friends_data=list(Friends.objects.filter(follow=request.user).values_list('following',flat=True))
+        user_profile = request.user.get(id=id)
+        friend=Friends.objects.filter(user_profile)
+        friends_data.pop(friend)
+        return render(request,'user-friends.html',context={"friends_list":friends_data})
+     
+
+
+def blocking_user(request,id):
+    friends_data=list(Friends.objects.filter(follow=request.user).values_list('following',flat=True))
+    user_profile=request.user.get(id=id)
+    friend=Friends.objects.filter(user_profile)
+    friends_data.pop(friend)
+    
+    block_list=list(BlockedUser.objects.filter(blocked_user=request.user).values_list('blocked_user',flat=True))
+    user_profile = request.user.get(id=id)
+    block_list.append(user_profile)
+    return render(request,'',context={"blocked_list":block_list,"friends_list":friends_data})
+
+     
+    
+    
+    
+
+
+
+    
+
